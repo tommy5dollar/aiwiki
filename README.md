@@ -1,6 +1,18 @@
 # aiwiki
 
-Generate Markdown documentation wikis from any codebase using OpenAI Codex CLI agents. Two-phase approach: first plans a catalog of pages, then generates each page with a dedicated agent that explores the repo.
+[![CI](https://github.com/tommy5dollar/aiwiki/actions/workflows/ci.yml/badge.svg)](https://github.com/tommy5dollar/aiwiki/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/aiwiki)](https://www.npmjs.com/package/aiwiki)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+Generate Markdown documentation wikis from any codebase using OpenAI Codex CLI agents.
+
+aiwiki uses a two-phase approach: first it plans a catalog of wiki pages by exploring your repo, then generates each page with a dedicated agent that reads the relevant source files in depth. The result is a set of interconnected Markdown files you can drop into any wiki, GitHub Pages site, or docs folder.
+
+## Prerequisites
+
+- Node.js >= 18
+- [OpenAI Codex CLI](https://github.com/openai/codex) installed globally (`npm install -g @openai/codex`)
+- `OPENAI_API_KEY` environment variable set
 
 ## Installation
 
@@ -8,16 +20,19 @@ Generate Markdown documentation wikis from any codebase using OpenAI Codex CLI a
 npm install -g aiwiki
 ```
 
-### Prerequisites
+## Usage
 
-- Node.js >= 18
-- [OpenAI Codex CLI](https://github.com/openai/codex) installed globally (`npm install -g @openai/codex`)
-- `OPENAI_API_KEY` environment variable set
-
-## CLI Usage
+Run from anywhere, pointing at the repo you want to document:
 
 ```bash
 aiwiki --repo-root /path/to/repo --model gpt-5-mini --reasoning-effort low
+```
+
+Or run inside the repo root with no flags and let defaults take over:
+
+```bash
+cd /path/to/repo
+OPENAI_API_KEY=sk-... aiwiki
 ```
 
 ### Options
@@ -35,13 +50,9 @@ aiwiki --repo-root /path/to/repo --model gpt-5-mini --reasoning-effort low
 | `--excluded-dirs <dirs>` | `DOCS_GEN_EXCLUDED_DIRS` | `node_modules,.git,dist,...` | Comma-separated directories to exclude |
 | `--log-level <level>` | `DOCS_GEN_LOG_LEVEL` | `info` | Log level: debug, info, warn, error |
 
-### Configuration Priority
+### Configuration file
 
-CLI flags > environment variables > `.aiwiki.json` in repo root > defaults
-
-### `.aiwiki.json` Example
-
-Place in the root of the repo being documented:
+Place an `.aiwiki.json` in the root of the repo being documented. CLI flags take priority over this file.
 
 ```json
 {
@@ -51,6 +62,39 @@ Place in the root of the repo being documented:
   "excludedDirs": "node_modules,.git,dist,coverage"
 }
 ```
+
+Config priority: CLI flags > environment variables > `.aiwiki.json` > defaults
+
+## GitHub Action
+
+aiwiki ships a composite action you can use directly from any workflow:
+
+```yaml
+- name: Generate docs
+  uses: tommy5dollar/aiwiki@main
+  with:
+    openai_api_key: ${{ secrets.OPENAI_API_KEY }}
+    model: gpt-5-mini
+    reasoning_effort: low
+    output_dir: wiki
+```
+
+See [`action.yml`](action.yml) for all available inputs.
+
+## Output
+
+Generates a directory containing:
+- `index.md` — table of contents with priority badges
+- `{slug}.md` — one Markdown page per wiki topic
+
+## Validation
+
+aiwiki automatically post-processes generated output:
+- Fixes Mermaid node labels containing `()`, `{}`, or `|` characters
+- Validates Mermaid diagram syntax
+- Checks minimum page length and heading structure
+- Verifies link integrity between index and pages
+- Detects orphaned pages
 
 ## Programmatic API
 
@@ -73,21 +117,6 @@ reportValidation(issues);
 writeOutput(config, indexContent, pages);
 ```
 
-## Output
-
-Generates a directory containing:
-- `index.md` — table of contents with priority badges
-- `{slug}.md` — one page per wiki topic
-
-## Validation
-
-The tool automatically:
-- Fixes Mermaid node labels with special characters (`()`, `{}`, `|`)
-- Validates Mermaid diagram syntax
-- Checks minimum page length and heading structure
-- Verifies link integrity between index and pages
-- Detects orphaned pages
-
 ## Development
 
 ```bash
@@ -96,3 +125,7 @@ npm run build    # Compile TypeScript
 npm test         # Run tests
 npm run lint     # ESLint
 ```
+
+## License
+
+[MIT](LICENSE)
