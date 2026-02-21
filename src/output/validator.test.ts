@@ -74,6 +74,18 @@ describe('validateOutput', () => {
     expect(issues.some(i => i.page === 'page-a' && i.message.includes('H2'))).toBe(true);
   });
 
+  it('accepts an H2 heading at the start of content', () => {
+    const pages = [
+      {
+        slug: 'page-a',
+        content: `## Start Heading\n\n${'A'.repeat(600)}\n\nSources: [a.ts:1]()\nSources: [b.ts:1]()`,
+      },
+      validPage('page-b'),
+    ];
+    const issues = validateOutput(structure, indexContent, pages);
+    expect(issues.some(i => i.page === 'page-a' && i.message.includes('H2'))).toBe(false);
+  });
+
   it('detects invalid mermaid diagram types', () => {
     const badMermaid = validPage('page-a');
     badMermaid.content += '\n```mermaid\ninvalidType\nA --> B\n```\n';
@@ -150,5 +162,12 @@ describe('validateOutput', () => {
     const original = page.content;
     validateOutput(structure, indexContent, [page, validPage('page-b')]);
     expect(page.content).toBe(original);
+  });
+
+  it('preserves dollar values in mermaid labels', () => {
+    const page = validPage('page-a');
+    page.content += '\n```mermaid\ngraph TD\n  A[Start] --> B[cost ($1)]\n```\n';
+    validateOutput(structure, indexContent, [page, validPage('page-b')]);
+    expect(page.content).toContain('B["cost ($1)"]');
   });
 });

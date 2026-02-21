@@ -2,8 +2,12 @@ export function buildCodexPagePrompt(
   pageTitle: string,
   pageDescription: string,
   relevantFiles: string[],
+  excludedDirs: string[],
+  excludedExtensions: string[],
 ): string {
   const fileList = relevantFiles.map(f => `- ${f}`).join('\n');
+  const excludedDirList = excludedDirs.map((dir) => `- ${dir}`).join('\n');
+  const excludedExtensionList = excludedExtensions.map((ext) => `- ${ext}`).join('\n');
 
   return `You are a technical writer producing a wiki page for a software team. You have the full output budget for this one page — be thorough, detailed, and comprehensive. Write clearly and concisely — every sentence should teach the reader something. Avoid filler, repetition, and stating the obvious.
 
@@ -18,6 +22,12 @@ Start by reading these files (they were identified as relevant):
 ${fileList}
 
 Then follow imports, references, and related files to build a complete understanding before writing. Read as many files as you need — you have the full budget for this single page, so be thorough in your research.
+
+Do not read files under these directories:
+${excludedDirList}
+
+Skip files with these extensions:
+${excludedExtensionList}
 
 ## Page Structure
 

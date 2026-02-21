@@ -37,7 +37,10 @@ function runCodexExec(
     execFile('codex', args, {
       timeout,
       maxBuffer: 50 * 1024 * 1024, // 50MB
-      env: { ...process.env },
+      env: {
+        ...process.env,
+        OPENAI_API_KEY: config.openaiApiKey,
+      },
     }, (error, stdout, stderr) => {
       if (stderr) {
         logger.debug(`codex stderr (last 1000 chars): ${stderr.slice(-1000)}`);
@@ -127,7 +130,11 @@ function validateCatalog(catalog: CodexCatalog): void {
 }
 
 async function generateCodexCatalog(config: Config): Promise<CodexCatalog> {
-  const prompt = buildCodexCatalogPrompt(config.projectName);
+  const prompt = buildCodexCatalogPrompt(
+    config.projectName,
+    config.excludedDirs,
+    config.excludedExtensions,
+  );
   const tmpDir = join(tmpdir(), 'aiwiki-codex');
   mkdirSync(tmpDir, { recursive: true });
   const outputPath = join(tmpDir, `catalog-${randomUUID().slice(0, 8)}.json`);
@@ -159,7 +166,13 @@ async function generateSingleCodexPage(
   config: Config,
   pagePlan: CatalogPage,
 ): Promise<GeneratedPage> {
-  const prompt = buildCodexPagePrompt(pagePlan.title, pagePlan.description, pagePlan.relevant_files);
+  const prompt = buildCodexPagePrompt(
+    pagePlan.title,
+    pagePlan.description,
+    pagePlan.relevant_files,
+    config.excludedDirs,
+    config.excludedExtensions,
+  );
   const tmpDir = join(tmpdir(), 'aiwiki-codex');
   mkdirSync(tmpDir, { recursive: true });
   const outputPath = join(tmpDir, `page-${pagePlan.slug}-${randomUUID().slice(0, 8)}.md`);
@@ -180,6 +193,10 @@ async function generateCodexPages(
   const concurrency = config.concurrency;
   let succeeded = 0;
   let failed = 0;
+
+  if (!Number.isInteger(concurrency) || concurrency < 1) {
+    throw new Error(`Invalid concurrency value: ${concurrency}. DOCS_GEN_CONCURRENCY must be a positive integer.`);
+  }
 
   logger.info(`Phase 2: Generating ${catalog.pages.length} pages (concurrency: ${concurrency})...`);
 

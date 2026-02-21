@@ -28,6 +28,17 @@ function parseCliArgs(): Record<string, string> {
   return args;
 }
 
+function parsePositiveInteger(
+  rawValue: unknown,
+  keyName: string,
+): number {
+  const parsed = Number(rawValue);
+  if (!Number.isFinite(parsed) || parsed <= 0 || !Number.isInteger(parsed)) {
+    throw new Error(`${keyName} must be a positive integer. Received: ${rawValue}`);
+  }
+  return parsed;
+}
+
 const CLI_TO_CONFIG: Record<string, { envKey: string; fileKey: string }> = {
   'output-dir':        { envKey: 'DOCS_GEN_OUTPUT_DIR', fileKey: 'outputDir' },
   'model':             { envKey: 'DOCS_GEN_MODEL', fileKey: 'model' },
@@ -101,8 +112,8 @@ export function loadConfig(): Config {
     excludedDirs,
     excludedExtensions: get('DOCS_GEN_EXCLUDED_EXTENSIONS', 'excludedExtensions', '.png,.jpg,.jpeg,.gif,.ico,.svg,.woff,.woff2,.ttf,.eot,.mp3,.mp4,.zip,.tar,.gz,.lock,.map')
       .toString().split(',').map((e: string) => e.trim()).filter(Boolean),
-    timeoutMs: Number(get('DOCS_GEN_TIMEOUT', 'timeout', '1200000')), // 20 min default
-    concurrency: Number(get('DOCS_GEN_CONCURRENCY', 'concurrency', '3')),
-    pageTimeout: Number(get('DOCS_GEN_PAGE_TIMEOUT', 'pageTimeout', '300000')), // 5 min default
+    timeoutMs: parsePositiveInteger(get('DOCS_GEN_TIMEOUT', 'timeout', '1200000'), 'DOCS_GEN_TIMEOUT'), // 20 min default
+    concurrency: parsePositiveInteger(get('DOCS_GEN_CONCURRENCY', 'concurrency', '3'), 'DOCS_GEN_CONCURRENCY'),
+    pageTimeout: parsePositiveInteger(get('DOCS_GEN_PAGE_TIMEOUT', 'pageTimeout', '300000'), 'DOCS_GEN_PAGE_TIMEOUT'), // 5 min default
   };
 }

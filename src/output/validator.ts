@@ -62,7 +62,7 @@ function fixMermaidLabels(
           return _m;
         },
       );
-      return fullMatch.replace(block, fixed);
+      return fullMatch.replace(block, () => fixed);
     },
   );
 }
@@ -143,7 +143,7 @@ function validatePageContent(page: GeneratedPage): ValidationIssue[] {
   }
 
   // Check for at least one H2 section
-  if (!page.content.includes('\n## ')) {
+  if (!/(^|\n)##\s+/.test(page.content)) {
     issues.push({
       page: page.slug,
       level: 'warning',

@@ -1,0 +1,115 @@
+name: AI Docs Generator
+description: Generate Markdown docs for a repository using aiwiki
+
+inputs:
+  openai_api_key:
+    description: OpenAI API key used by Codex CLI
+    required: true
+  openai_base_url:
+    description: Optional OpenAI-compatible base URL (for proxies or compatible APIs)
+    required: false
+    default: https://api.openai.com/v1
+  repo_root:
+    description: Repository root to document
+    required: false
+    default: .
+  project_name:
+    description: Optional project name override
+    required: false
+    default: ''
+  output_dir:
+    description: Optional output directory (relative to repo_root)
+    required: false
+    default: ''
+  model:
+    description: Codex model
+    required: false
+    default: gpt-5-mini
+  reasoning_effort:
+    description: Reasoning effort (low, medium, high)
+    required: false
+    default: low
+  concurrency:
+    description: Number of concurrent page agents
+    required: false
+    default: '3'
+  page_timeout:
+    description: Per-page timeout in ms
+    required: false
+    default: '300000'
+  timeout:
+    description: Overall timeout in ms
+    required: false
+    default: '1200000'
+  excluded_dirs:
+    description: Optional comma-separated directories to exclude
+    required: false
+    default: ''
+  log_level:
+    description: Log level (debug, info, warn, error)
+    required: false
+    default: info
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Node
+      uses: actions/setup-node@v4
+      with:
+        node-version: "22"
+
+    - name: Install Codex CLI
+      shell: bash
+      run: npm install -g @openai/codex
+
+    - name: Install package dependencies
+      shell: bash
+      working-directory: ${{ github.action_path }}
+      run: npm ci
+
+    - name: Build package
+      shell: bash
+      working-directory: ${{ github.action_path }}
+      run: npm run build
+
+    - name: Generate documentation
+      shell: bash
+      env:
+        OPENAI_API_KEY: ${{ inputs.openai_api_key }}
+        OPENAI_BASE_URL: ${{ inputs.openai_base_url }}
+        REPO_ROOT: ${{ inputs.repo_root }}
+        PROJECT_NAME: ${{ inputs.project_name }}
+        OUTPUT_DIR: ${{ inputs.output_dir }}
+        MODEL: ${{ inputs.model }}
+        REASONING_EFFORT: ${{ inputs.reasoning_effort }}
+        CONCURRENCY: ${{ inputs.concurrency }}
+        PAGE_TIMEOUT: ${{ inputs.page_timeout }}
+        TIMEOUT: ${{ inputs.timeout }}
+        EXCLUDED_DIRS: ${{ inputs.excluded_dirs }}
+        LOG_LEVEL: ${{ inputs.log_level }}
+      run: |
+        set -euo pipefail
+
+        args=(
+          --repo-root "$REPO_ROOT"
+          --model "$MODEL"
+          --reasoning-effort "$REASONING_EFFORT"
+          --concurrency "$CONCURRENCY"
+          --page-timeout "$PAGE_TIMEOUT"
+          --timeout "$TIMEOUT"
+          --log-level "$LOG_LEVEL"
+        )
+
+        if [[ -n "$PROJECT_NAME" ]]; then
+          args+=(--project-name "$PROJECT_NAME")
+        fi
+
+        if [[ -n "$OUTPUT_DIR" ]]; then
+          args+=(--output-dir "$OUTPUT_DIR")
+        fi
+
+        if [[ -n "$EXCLUDED_DIRS" ]]; then
+          args+=(--excluded-dirs "$EXCLUDED_DIRS")
+        fi
+
+        node "$GITHUB_ACTION_PATH/dist/cli.js" "${args[@]}"

@@ -1,4 +1,11 @@
-export function buildCodexCatalogPrompt(projectName: string): string {
+export function buildCodexCatalogPrompt(
+  projectName: string,
+  excludedDirs: string[],
+  excludedExtensions: string[],
+): string {
+  const excludedDirList = excludedDirs.map((dir) => `- ${dir}`).join('\n');
+  const excludedExtensionList = excludedExtensions.map((ext) => `- ${ext}`).join('\n');
+
   return `You are a technical writer planning a wiki for the "${projectName}" repository. Your ONLY job is to explore the codebase and produce a JSON catalog of pages to write. Do NOT write any page content.
 
 ## How to Explore
@@ -9,6 +16,12 @@ Use your tools to understand the project:
 - Read key source files, following imports to understand how components connect
 - Look at infrastructure (Terraform, Docker, CI/CD) if present
 - Identify the major subsystems, data flows, and architectural boundaries
+
+Never read files from these excluded directories:
+${excludedDirList}
+
+Avoid binary/static files with these extensions:
+${excludedExtensionList}
 
 ## Planning Guidelines
 
