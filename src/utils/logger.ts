@@ -5,7 +5,7 @@ const currentLevel: Level = (process.env.DOCS_GEN_LOG_LEVEL as Level) || 'info';
 
 function log(level: Level, ...args: unknown[]) {
   if (LEVELS[level] < LEVELS[currentLevel]) return;
-  const prefix = `[docs-gen:${level}]`;
+  const prefix = `[aiwiki:${level}]`;
   if (level === 'error') {
     console.error(prefix, ...args);
   } else if (level === 'warn') {

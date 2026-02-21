@@ -17,7 +17,7 @@ npm install -g aiwiki
 ## CLI Usage
 
 ```bash
-docs-gen --repo-root /path/to/repo --model gpt-5-mini --reasoning-effort low
+aiwiki --repo-root /path/to/repo --model gpt-5-mini --reasoning-effort low
 ```
 
 ### Options
@@ -37,9 +37,9 @@ docs-gen --repo-root /path/to/repo --model gpt-5-mini --reasoning-effort low
 
 ### Configuration Priority
 
-CLI flags > environment variables > `.docs-gen.json` in repo root > defaults
+CLI flags > environment variables > `.aiwiki.json` in repo root > defaults
 
-### `.docs-gen.json` Example
+### `.aiwiki.json` Example
 
 Place in the root of the repo being documented:
 

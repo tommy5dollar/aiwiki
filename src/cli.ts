@@ -19,7 +19,7 @@ function checkCodexOnPath(): void {
 }
 
 const program = new Command()
-  .name('docs-gen')
+  .name('aiwiki')
   .description('Generate Markdown documentation wikis from a codebase using Codex CLI agents')
   .option('--repo-root <path>', 'Repository root directory')
   .option('--project-name <name>', 'Project name used in prompts')
@@ -47,7 +47,7 @@ const program = new Command()
     checkCodexOnPath();
 
     const startTime = Date.now();
-    logger.info('docs-gen starting...');
+    logger.info('aiwiki starting...');
 
     const config = loadConfig();
     logger.info(`Project: ${config.projectName}`);

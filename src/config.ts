@@ -43,14 +43,20 @@ const CLI_TO_CONFIG: Record<string, { envKey: string; fileKey: string }> = {
 export function loadConfig(): Config {
   const cliArgs = parseCliArgs();
 
-  // Try loading .docs-gen.json from repo root
+  // Try loading config from repo root
   let fileConfig: Record<string, unknown> = {};
   const repoRoot = cliArgs['repo-root'] || process.env.DOCS_GEN_REPO_ROOT || process.cwd();
   try {
-    const raw = readFileSync(resolve(repoRoot, '.docs-gen.json'), 'utf-8');
+    const raw = readFileSync(resolve(repoRoot, '.aiwiki.json'), 'utf-8');
     fileConfig = JSON.parse(raw);
   } catch {
-    // No config file — that's fine
+    try {
+      // Backwards compatibility with older config filename
+      const raw = readFileSync(resolve(repoRoot, '.docs-gen.json'), 'utf-8');
+      fileConfig = JSON.parse(raw);
+    } catch {
+      // No config file — that's fine
+    }
   }
 
   function get<T>(envKey: string, fileKey: string, defaultVal: T): T {

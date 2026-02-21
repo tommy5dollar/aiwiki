@@ -128,7 +128,7 @@ function validateCatalog(catalog: CodexCatalog): void {
 
 async function generateCodexCatalog(config: Config): Promise<CodexCatalog> {
   const prompt = buildCodexCatalogPrompt(config.projectName);
-  const tmpDir = join(tmpdir(), 'docs-gen-codex');
+  const tmpDir = join(tmpdir(), 'aiwiki-codex');
   mkdirSync(tmpDir, { recursive: true });
   const outputPath = join(tmpDir, `catalog-${randomUUID().slice(0, 8)}.json`);
 
@@ -160,7 +160,7 @@ async function generateSingleCodexPage(
   pagePlan: CatalogPage,
 ): Promise<GeneratedPage> {
   const prompt = buildCodexPagePrompt(pagePlan.title, pagePlan.description, pagePlan.relevant_files);
-  const tmpDir = join(tmpdir(), 'docs-gen-codex');
+  const tmpDir = join(tmpdir(), 'aiwiki-codex');
   mkdirSync(tmpDir, { recursive: true });
   const outputPath = join(tmpDir, `page-${pagePlan.slug}-${randomUUID().slice(0, 8)}.md`);
 
