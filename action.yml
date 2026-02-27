@@ -87,6 +87,7 @@ runs:
         TIMEOUT: ${{ inputs.timeout }}
         EXCLUDED_DIRS: ${{ inputs.excluded_dirs }}
         LOG_LEVEL: ${{ inputs.log_level }}
+        DOCS_GEN_MERMAID_VALIDATE_COMMAND: ${{ github.action_path }}/node_modules/.bin/mmdc
       run: |
         set -euo pipefail
 

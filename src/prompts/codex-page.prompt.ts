@@ -4,6 +4,7 @@ export function buildCodexPagePrompt(
   relevantFiles: string[],
   excludedDirs: string[],
   excludedExtensions: string[],
+  mermaidValidationCommand: string,
 ): string {
   const fileList = relevantFiles.map(f => `- ${f}`).join('\n');
   const excludedDirList = excludedDirs.map((dir) => `- ${dir}`).join('\n');
@@ -112,7 +113,7 @@ cat > /tmp/test.mmd << 'MERMAID'
 graph TD
   A[Node A] --> B[Node B]
 MERMAID
-npx -y @mermaid-js/mermaid-cli -i /tmp/test.mmd -o /tmp/test.svg 2>&1
+${mermaidValidationCommand} -i /tmp/test.mmd -o /tmp/test.svg 2>&1
 \`\`\`
 If mmdc reports a parse error, fix the diagram and re-validate until it passes. Common fixes:
 - Remove parentheses, braces, or pipes from node labels

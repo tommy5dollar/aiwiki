@@ -23,11 +23,13 @@ describe('codex prompts', () => {
       ['src/index.ts'],
       excludedDirs,
       excludedExtensions,
+      'npx --no-install @mermaid-js/mermaid-cli',
     );
 
     expect(prompt).toContain('Do not read files under these directories');
     expect(prompt).toContain('- docs-output');
     expect(prompt).toContain('Skip files with these extensions');
     expect(prompt).toContain('- .jpg');
+    expect(prompt).toContain('npx --no-install @mermaid-js/mermaid-cli -i /tmp/test.mmd -o /tmp/test.svg 2>&1');
   });
 });

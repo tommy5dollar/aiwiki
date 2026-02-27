@@ -9,6 +9,9 @@ import { buildCodexCatalogPrompt } from '../prompts/codex-catalog.prompt.js';
 import { buildCodexPagePrompt } from '../prompts/codex-page.prompt.js';
 import { logger } from '../utils/logger.js';
 
+const PAGE_GENERATION_MAX_ATTEMPTS = 2;
+const PAGE_RETRY_DELAY_MS = 2000;
+
 function buildCodexArgs(config: Config, outputPath: string): string[] {
   return [
     'exec',
@@ -172,17 +175,29 @@ async function generateSingleCodexPage(
     pagePlan.relevant_files,
     config.excludedDirs,
     config.excludedExtensions,
+    config.mermaidValidationCommand,
   );
   const tmpDir = join(tmpdir(), 'aiwiki-codex');
   mkdirSync(tmpDir, { recursive: true });
-  const outputPath = join(tmpDir, `page-${pagePlan.slug}-${randomUUID().slice(0, 8)}.md`);
 
-  try {
-    const content = await runCodexExec(config, prompt, outputPath, config.pageTimeout);
-    return { slug: pagePlan.slug, content };
-  } finally {
-    try { unlinkSync(outputPath); } catch { /* already cleaned or never created */ }
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= PAGE_GENERATION_MAX_ATTEMPTS; attempt++) {
+    const outputPath = join(tmpDir, `page-${pagePlan.slug}-${randomUUID().slice(0, 8)}.md`);
+    try {
+      const content = await runCodexExec(config, prompt, outputPath, config.pageTimeout);
+      return { slug: pagePlan.slug, content };
+    } catch (error) {
+      lastError = error;
+      if (attempt < PAGE_GENERATION_MAX_ATTEMPTS) {
+        logger.warn(`Retrying page "${pagePlan.slug}" after failed attempt ${attempt}/${PAGE_GENERATION_MAX_ATTEMPTS}.`);
+        await new Promise((resolve) => setTimeout(resolve, PAGE_RETRY_DELAY_MS));
+      }
+    } finally {
+      try { unlinkSync(outputPath); } catch { /* already cleaned or never created */ }
+    }
   }
+
+  throw lastError;
 }
 
 async function generateCodexPages(

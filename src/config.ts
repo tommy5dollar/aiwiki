@@ -1,8 +1,10 @@
-import { readFileSync } from 'fs';
-import { basename, resolve } from 'path';
+import { existsSync, readFileSync } from 'fs';
+import { dirname, basename, resolve } from 'path';
+import { fileURLToPath } from 'url';
 
 export interface Config {
   openaiApiKey: string;
+  mermaidValidationCommand: string;
   model: string;
   reasoningEffort: string;
   outputDir: string;
@@ -37,6 +39,25 @@ function parsePositiveInteger(
     throw new Error(`${keyName} must be a positive integer. Received: ${rawValue}`);
   }
   return parsed;
+}
+
+function resolveDefaultMermaidValidationCommand(): string {
+  let currentDir = dirname(fileURLToPath(import.meta.url));
+
+  while (true) {
+    const candidate = resolve(currentDir, 'node_modules/.bin/mmdc');
+    if (existsSync(candidate)) {
+      return candidate;
+    }
+
+    const parentDir = dirname(currentDir);
+    if (parentDir === currentDir) {
+      break;
+    }
+    currentDir = parentDir;
+  }
+
+  return 'npx --no-install @mermaid-js/mermaid-cli';
 }
 
 const CLI_TO_CONFIG: Record<string, { envKey: string; fileKey: string }> = {
@@ -104,6 +125,11 @@ export function loadConfig(): Config {
 
   return {
     openaiApiKey,
+    mermaidValidationCommand: get(
+      'DOCS_GEN_MERMAID_VALIDATE_COMMAND',
+      'mermaidValidationCommand',
+      resolveDefaultMermaidValidationCommand(),
+    ),
     model,
     reasoningEffort,
     outputDir,
