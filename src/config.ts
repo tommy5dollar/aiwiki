@@ -1,6 +1,8 @@
-import { existsSync, readFileSync } from 'fs';
-import { dirname, basename, resolve } from 'path';
+import { chmodSync, copyFileSync, existsSync, readFileSync, writeFileSync } from 'fs';
+import { dirname, basename, resolve, join } from 'path';
+import { tmpdir } from 'os';
 import { fileURLToPath } from 'url';
+import { randomUUID } from 'crypto';
 
 export interface Config {
   openaiApiKey: string;
@@ -15,6 +17,7 @@ export interface Config {
   timeoutMs: number;
   concurrency: number;
   pageTimeout: number;
+  traceId: string;
 }
 
 function parseCliArgs(): Record<string, string> {
@@ -43,21 +46,50 @@ function parsePositiveInteger(
 
 function resolveDefaultMermaidValidationCommand(): string {
   let currentDir = dirname(fileURLToPath(import.meta.url));
+  let mmdcPath = 'npx --no-install @mermaid-js/mermaid-cli';
 
+  // Find mmdc binary
   while (true) {
     const candidate = resolve(currentDir, 'node_modules/.bin/mmdc');
     if (existsSync(candidate)) {
-      return candidate;
-    }
-
-    const parentDir = dirname(currentDir);
-    if (parentDir === currentDir) {
+      mmdcPath = candidate;
       break;
     }
+    const parentDir = dirname(currentDir);
+    if (parentDir === currentDir) break;
     currentDir = parentDir;
   }
 
-  return 'npx --no-install @mermaid-js/mermaid-cli';
+  // Find puppeteer config (ships with this package)
+  currentDir = dirname(fileURLToPath(import.meta.url));
+  let puppeteerConfigPath: string | undefined;
+
+  while (true) {
+    const candidate = resolve(currentDir, 'puppeteer-config.json');
+    if (existsSync(candidate)) {
+      puppeteerConfigPath = candidate;
+      break;
+    }
+    const parentDir = dirname(currentDir);
+    if (parentDir === currentDir) break;
+    currentDir = parentDir;
+  }
+
+  if (puppeteerConfigPath) {
+    // Write a wrapper script that bakes in the puppeteer config.
+    // Codex agents run the mmdc command from the prompt but may omit flags
+    // like -p. A wrapper script ensures --no-sandbox is always applied.
+    const tmpPath = join(tmpdir(), 'puppeteer-config.json');
+    copyFileSync(puppeteerConfigPath, tmpPath);
+
+    const wrapperPath = join(tmpdir(), 'mmdc-validate.sh');
+    writeFileSync(wrapperPath, `#!/bin/bash\n${mmdcPath} -p ${tmpPath} "$@"\n`, 'utf-8');
+    chmodSync(wrapperPath, 0o755);
+
+    return wrapperPath;
+  }
+
+  return mmdcPath;
 }
 
 const CLI_TO_CONFIG: Record<string, { envKey: string; fileKey: string }> = {
@@ -70,6 +102,7 @@ const CLI_TO_CONFIG: Record<string, { envKey: string; fileKey: string }> = {
   'repo-root':         { envKey: 'DOCS_GEN_REPO_ROOT', fileKey: 'repoRoot' },
   'project-name':      { envKey: 'DOCS_GEN_PROJECT_NAME', fileKey: 'projectName' },
   'excluded-dirs':     { envKey: 'DOCS_GEN_EXCLUDED_DIRS', fileKey: 'excludedDirs' },
+  'trace-id':          { envKey: 'DOCS_GEN_TRACE_ID', fileKey: 'traceId' },
 };
 
 export function loadConfig(): Config {
@@ -141,5 +174,6 @@ export function loadConfig(): Config {
     timeoutMs: parsePositiveInteger(get('DOCS_GEN_TIMEOUT', 'timeout', '1200000'), 'DOCS_GEN_TIMEOUT'), // 20 min default
     concurrency: parsePositiveInteger(get('DOCS_GEN_CONCURRENCY', 'concurrency', '3'), 'DOCS_GEN_CONCURRENCY'),
     pageTimeout: parsePositiveInteger(get('DOCS_GEN_PAGE_TIMEOUT', 'pageTimeout', '300000'), 'DOCS_GEN_PAGE_TIMEOUT'), // 5 min default
+    traceId: get('DOCS_GEN_TRACE_ID', 'traceId', `aiwiki-${randomUUID().slice(0, 8)}`),
   };
 }

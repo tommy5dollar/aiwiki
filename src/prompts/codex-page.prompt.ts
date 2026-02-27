@@ -4,7 +4,6 @@ export function buildCodexPagePrompt(
   relevantFiles: string[],
   excludedDirs: string[],
   excludedExtensions: string[],
-  mermaidValidationCommand: string,
 ): string {
   const fileList = relevantFiles.map(f => `- ${f}`).join('\n');
   const excludedDirList = excludedDirs.map((dir) => `- ${dir}`).join('\n');
@@ -72,16 +71,20 @@ NEVER use:
 
 Keep node labels short (3-4 words max). For sequence diagrams, define all participants first.
 
-CRITICAL Mermaid syntax rule: Node labels inside square brackets MUST NOT contain parentheses \`()\`, curly braces \`{}\`, or pipe \`|\` characters — Mermaid interprets these as shape syntax and the diagram will fail to render.
+CRITICAL Mermaid syntax rule: Node labels inside square brackets MUST NOT contain parentheses \`()\`, curly braces \`{}\`, pipe \`|\`, nested square brackets \`[]\`, forward slashes \`/\`, or backslashes \`\\\` — Mermaid interprets these as shape syntax and the diagram will fail to render.
 
 Preferred fix: reword the label to avoid special characters:
 - BAD:  \`A[Event Bus (cis)]\` → GOOD: \`A[CIS Event Bus]\`
 - BAD:  \`B[Create|Update|Delete]\` → GOOD: \`B[Create Update Delete]\`
+- BAD:  \`I[returns process.env[key]]\` → GOOD: \`I[returns env var by key]\`
+- BAD:  \`C[/api/notion/title route]\` → GOOD: \`C[API Notion Title Route]\`
 
 If special characters are essential to the meaning, wrap the label in double quotes:
 - \`A["process.env || fallback"]\`
 - \`B["config/{env}.js"]\`
 - \`C["Secrets Manager (AWS)"]\`
+- \`I["process.env[key]"]\`
+- \`D["/api/notion/title"]\`
 
 ## Tables
 
@@ -104,21 +107,7 @@ Include short snippets (5-15 lines) from source files where they clarify somethi
 - NO emoji in headings or body text.
 - NO meta-commentary about the document itself.
 
-## Validation (do this before producing final output)
-
-### Mermaid Validation
-For each mermaid diagram you wrote, write it to a temp file and validate it:
-\`\`\`bash
-cat > /tmp/test.mmd << 'MERMAID'
-graph TD
-  A[Node A] --> B[Node B]
-MERMAID
-${mermaidValidationCommand} -i /tmp/test.mmd -o /tmp/test.svg 2>&1
-\`\`\`
-If mmdc reports a parse error, fix the diagram and re-validate until it passes. Common fixes:
-- Remove parentheses, braces, or pipes from node labels
-- Ensure the diagram starts with a valid type (graph TD, sequenceDiagram, etc.)
-- Check for unclosed brackets
+## Validation
 
 ### File Path Validation
 For each file path referenced in the \`<details>\` source files block or in the page body, verify it exists:
@@ -133,5 +122,10 @@ All information must come from the actual code you read. Never fabricate code, f
 
 ## Output
 
-Return ONLY the markdown content. Start directly with \`<details>\`.`;
+Your response must be a JSON object with these fields:
+
+- **content** (string, required): The full markdown page content, starting with the \`<details>\` source files block.
+- **filesRead** (string[], required): Every source file path you read during research. These must match the files listed in your \`<details>\` block.
+
+Always produce your JSON output promptly after finishing research and writing. Do not run additional validation tools — mermaid diagrams will be validated externally after generation.`;
 }

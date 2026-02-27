@@ -1,5 +1,5 @@
-import { execFile } from 'child_process';
-import { readFileSync, mkdirSync, unlinkSync } from 'fs';
+import { execFile, execFileSync } from 'child_process';
+import { readFileSync, mkdirSync, unlinkSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { randomUUID } from 'crypto';
@@ -11,6 +11,36 @@ import { logger } from '../utils/logger.js';
 
 const PAGE_GENERATION_MAX_ATTEMPTS = 2;
 const PAGE_RETRY_DELAY_MS = 2000;
+
+// --- Page output schema ---
+
+interface CodexPageOutput {
+  content: string;
+  filesRead: string[];
+}
+
+const PAGE_OUTPUT_SCHEMA = {
+  type: 'object',
+  required: ['content', 'filesRead'],
+  additionalProperties: false,
+  properties: {
+    content: {
+      type: 'string',
+      description: 'The full markdown page content, starting with the <details> source files block.',
+    },
+    filesRead: {
+      type: 'array',
+      items: { type: 'string' },
+      description: 'Every source file path read during research.',
+    },
+  },
+};
+
+function writePageOutputSchema(tmpDir: string): string {
+  const schemaPath = join(tmpDir, 'page-output-schema.json');
+  writeFileSync(schemaPath, JSON.stringify(PAGE_OUTPUT_SCHEMA, null, 2), 'utf-8');
+  return schemaPath;
+}
 
 function buildCodexArgs(config: Config, outputPath: string): string[] {
   return [
@@ -28,11 +58,12 @@ function runCodexExec(
   prompt: string,
   outputPath: string,
   timeoutMs?: number,
+  extraArgs?: string[],
 ): Promise<string> {
   const timeout = timeoutMs ?? config.timeoutMs;
 
   return new Promise((resolve, reject) => {
-    const args = [...buildCodexArgs(config, outputPath), prompt];
+    const args = [...buildCodexArgs(config, outputPath), ...(extraArgs ?? []), prompt];
 
     logger.debug(`Running: codex ${args.join(' ').slice(0, 200)}...`);
     logger.info(`Timeout: ${(timeout / 1000 / 60).toFixed(0)} minutes`);
@@ -165,9 +196,46 @@ async function generateCodexCatalog(config: Config): Promise<CodexCatalog> {
 
 // --- Phase 2: Per-page generation ---
 
+function runMmdc(mermaidCommand: string, markdownContent: string, slug: string): void {
+  const tmpDir = join(tmpdir(), 'aiwiki-codex');
+  mkdirSync(tmpDir, { recursive: true });
+  const inputPath = join(tmpDir, `mmdc-${slug}-${randomUUID().slice(0, 8)}.md`);
+  const outputPath = join(tmpDir, `mmdc-${slug}-${randomUUID().slice(0, 8)}-out.md`);
+
+  try {
+    writeFileSync(inputPath, markdownContent, 'utf-8');
+
+    const diagramCount = (markdownContent.match(/```mermaid/g) || []).length;
+    if (diagramCount === 0) {
+      logger.debug(`[${slug}] No mermaid diagrams to validate`);
+      return;
+    }
+
+    logger.info(`[${slug}] Validating ${diagramCount} mermaid diagram(s) via mmdc...`);
+
+    try {
+      const output = execFileSync('bash', ['-c', `${mermaidCommand} -i ${inputPath} -o ${outputPath} 2>&1`], {
+        timeout: 30000,
+        maxBuffer: 10 * 1024 * 1024,
+      });
+      logger.info(`[${slug}] All ${diagramCount} mermaid diagram(s) passed validation`);
+      logger.debug(`[${slug}] mmdc output: ${output.toString().slice(0, 500)}`);
+    } catch (error: unknown) {
+      const err = error as { stdout?: Buffer; stderr?: Buffer; status?: number };
+      const output = err.stdout?.toString() ?? err.stderr?.toString() ?? String(error);
+      logger.error(`[${slug}] Mermaid validation failed (mmdc exit code ${err.status ?? 'unknown'})`);
+      logger.error(`[${slug}]   mmdc output: ${output.slice(0, 1000)}`);
+    }
+  } finally {
+    try { unlinkSync(inputPath); } catch { /* ignore */ }
+    try { unlinkSync(outputPath); } catch { /* ignore */ }
+  }
+}
+
 async function generateSingleCodexPage(
   config: Config,
   pagePlan: CatalogPage,
+  schemaPath: string,
 ): Promise<GeneratedPage> {
   const prompt = buildCodexPagePrompt(
     pagePlan.title,
@@ -175,17 +243,30 @@ async function generateSingleCodexPage(
     pagePlan.relevant_files,
     config.excludedDirs,
     config.excludedExtensions,
-    config.mermaidValidationCommand,
   );
   const tmpDir = join(tmpdir(), 'aiwiki-codex');
   mkdirSync(tmpDir, { recursive: true });
 
   let lastError: unknown;
   for (let attempt = 1; attempt <= PAGE_GENERATION_MAX_ATTEMPTS; attempt++) {
-    const outputPath = join(tmpDir, `page-${pagePlan.slug}-${randomUUID().slice(0, 8)}.md`);
+    const outputPath = join(tmpDir, `page-${pagePlan.slug}-${randomUUID().slice(0, 8)}.json`);
     try {
-      const content = await runCodexExec(config, prompt, outputPath, config.pageTimeout);
-      return { slug: pagePlan.slug, content };
+      const raw = await runCodexExec(
+        config, prompt, outputPath, config.pageTimeout,
+        ['--output-schema', schemaPath],
+      );
+      const pageOutput = parseJsonOutput<CodexPageOutput>(raw, `page:${pagePlan.slug}`);
+
+      if (!pageOutput.content || typeof pageOutput.content !== 'string') {
+        throw new Error(`Page "${pagePlan.slug}" returned empty or invalid content field`);
+      }
+
+      logger.info(`[${pagePlan.slug}] Files read: ${pageOutput.filesRead?.length ?? 0}`);
+
+      // Validate mermaid diagrams on the host — more reliable than asking the agent
+      runMmdc(config.mermaidValidationCommand, pageOutput.content, pagePlan.slug);
+
+      return { slug: pagePlan.slug, content: pageOutput.content };
     } catch (error) {
       lastError = error;
       if (attempt < PAGE_GENERATION_MAX_ATTEMPTS) {
@@ -213,6 +294,12 @@ async function generateCodexPages(
     throw new Error(`Invalid concurrency value: ${concurrency}. DOCS_GEN_CONCURRENCY must be a positive integer.`);
   }
 
+  // Write the JSON schema once — all page agents share it
+  const tmpDir = join(tmpdir(), 'aiwiki-codex');
+  mkdirSync(tmpDir, { recursive: true });
+  const schemaPath = writePageOutputSchema(tmpDir);
+  logger.debug(`Page output schema written to: ${schemaPath}`);
+
   logger.info(`Phase 2: Generating ${catalog.pages.length} pages (concurrency: ${concurrency})...`);
 
   for (let i = 0; i < catalog.pages.length; i += concurrency) {
@@ -222,7 +309,7 @@ async function generateCodexPages(
     logger.info(`Batch ${batchNum}/${totalBatches}: ${batch.map(p => p.slug).join(', ')}`);
 
     const batchResults = await Promise.allSettled(
-      batch.map(page => generateSingleCodexPage(config, page)),
+      batch.map(page => generateSingleCodexPage(config, page, schemaPath)),
     );
 
     for (let j = 0; j < batchResults.length; j++) {
@@ -252,11 +339,19 @@ async function generateCodexPages(
 
 // --- Orchestrator ---
 
+// Exported for unit testing only — not part of the public API.
+export { buildCodexArgs as _buildCodexArgs };
+export { parseJsonOutput as _parseJsonOutput };
+export { validateCatalog as _validateCatalog };
+export type { CatalogPage as _CatalogPage };
+export type { CodexCatalog as _CodexCatalog };
+
 export async function generateCodexWiki(
   config: Config,
 ): Promise<{ structure: WikiStructure; pages: GeneratedPage[] }> {
   logger.info('Starting two-phase codex wiki generation...');
   logger.info(`Model: ${config.model}`);
+  logger.info(`Trace ID: ${config.traceId}`);
 
   // Phase 1: Catalog
   const catalog = await generateCodexCatalog(config);

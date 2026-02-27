@@ -9,7 +9,9 @@
     "aiwiki": "dist/cli.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "action.yml",
+    "puppeteer-config.json"
   ],
   "scripts": {
     "build": "tsc",

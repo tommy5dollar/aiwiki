@@ -23,7 +23,6 @@ export function validateOutput(
 
   for (const page of pages) {
     page.content = fixMermaidLabels(page.content, page.slug, issues);
-    issues.push(...validateMermaid(page));
     issues.push(...validatePageContent(page));
   }
 
@@ -34,10 +33,10 @@ export function validateOutput(
 }
 
 /**
- * Auto-fix Mermaid node labels that contain special characters.
- * Wraps unquoted labels containing (){}| in double quotes, which is
- * valid Mermaid syntax: A["label with (parens)"]
- * Runs before validation so the validator sees clean diagrams.
+ * Last-resort auto-fix for Mermaid node labels with special characters.
+ * If this fires, it means the Codex agent failed to produce valid Mermaid
+ * despite being required to validate with mmdc via the output schema.
+ * Logs as errors so we notice when the primary validation isn't working.
  */
 function fixMermaidLabels(
   content: string,
@@ -47,15 +46,17 @@ function fixMermaidLabels(
   return content.replace(
     /```mermaid\s*\n([\s\S]*?)```/g,
     (fullMatch, block: string) => {
-      // Match unquoted node labels: ID[label] but not ID["label"]
+      // Matches unquoted node labels including those with nested brackets:
+      // ID[label], ID[label[inner]], ID[a[b] and [c]]
+      // Skips already-quoted labels like ID["label"]
       const fixed = block.replace(
-        /(\w+)\[([^\]"]+)\]/g,
+        /(\w+)\[((?:[^[\]"]*(?:\[[^\]]*\][^[\]"]*)*)?[^[\]"]*)\]/g,
         (_m: string, id: string, label: string) => {
-          if (/[(){}|]/.test(label)) {
+          if (/[(){}|[\]/\\]/.test(label)) {
             issues.push({
               page: slug,
-              level: 'warning',
-              message: `Mermaid auto-fix: quoted node label "${label.slice(0, 40)}"`,
+              level: 'error',
+              message: `Mermaid auto-fix needed (agent mmdc validation may have been skipped): quoted node label "${label.slice(0, 60)}"`,
             });
             return `${id}["${label}"]`;
           }
@@ -65,69 +66,6 @@ function fixMermaidLabels(
       return fullMatch.replace(block, () => fixed);
     },
   );
-}
-
-/** Check that mermaid code blocks have valid-looking syntax */
-function validateMermaid(page: GeneratedPage): ValidationIssue[] {
-  const issues: ValidationIssue[] = [];
-  const mermaidRegex = /```mermaid\s*\n([\s\S]*?)```/g;
-  let match: RegExpExecArray | null;
-
-  while ((match = mermaidRegex.exec(page.content)) !== null) {
-    const block = match[1];
-    const blockNum = page.content.slice(0, match.index).split('```mermaid').length;
-
-    // Must start with a valid diagram type
-    const firstLine = block.trim().split('\n')[0].trim();
-    const validStarts = [
-      'graph ', 'flowchart ', 'sequenceDiagram', 'classDiagram',
-      'erDiagram', 'stateDiagram', 'gantt', 'pie', 'gitgraph',
-      'journey', 'mindmap', 'timeline', 'block-beta',
-    ];
-    if (!validStarts.some(s => firstLine.startsWith(s))) {
-      issues.push({
-        page: page.slug,
-        level: 'error',
-        message: `Mermaid block #${blockNum}: invalid diagram type "${firstLine.slice(0, 40)}"`,
-      });
-    }
-
-    // Check for unclosed brackets/parens
-    const opens = (block.match(/[[({]/g) || []).length;
-    const closes = (block.match(/[\])}]/g) || []).length;
-    if (opens !== closes) {
-      issues.push({
-        page: page.slug,
-        level: 'error',
-        message: `Mermaid block #${blockNum}: mismatched brackets (${opens} open, ${closes} close)`,
-      });
-    }
-
-    // Check for graph LR (should be TD per our prompt)
-    if (/graph\s+LR/i.test(block)) {
-      issues.push({
-        page: page.slug,
-        level: 'warning',
-        message: `Mermaid block #${blockNum}: uses "graph LR" instead of "graph TD"`,
-      });
-    }
-
-    // Check for unquoted special characters that survived the auto-fix
-    const nodeLabels = block.matchAll(/\w+\[([^\]"]+)\]/g);
-    for (const labelMatch of nodeLabels) {
-      const label = labelMatch[1];
-      if (/[(){}|]/.test(label)) {
-        issues.push({
-          page: page.slug,
-          level: 'error',
-          message: `Mermaid block #${blockNum}: node label "${label.slice(0, 40)}" contains special characters that break Mermaid parsing`,
-        });
-        break;
-      }
-    }
-  }
-
-  return issues;
 }
 
 /** Check that pages aren't empty stubs */

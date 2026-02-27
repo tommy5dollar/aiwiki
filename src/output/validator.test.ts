@@ -86,27 +86,6 @@ describe('validateOutput', () => {
     expect(issues.some(i => i.page === 'page-a' && i.message.includes('H2'))).toBe(false);
   });
 
-  it('detects invalid mermaid diagram types', () => {
-    const badMermaid = validPage('page-a');
-    badMermaid.content += '\n```mermaid\ninvalidType\nA --> B\n```\n';
-    const issues = validateOutput(structure, indexContent, [badMermaid, validPage('page-b')]);
-    expect(issues.some(i => i.message.includes('invalid diagram type'))).toBe(true);
-  });
-
-  it('detects mismatched brackets in mermaid', () => {
-    const badMermaid = validPage('page-a');
-    badMermaid.content += '\n```mermaid\ngraph TD\nA[Unclosed --> B\n```\n';
-    const issues = validateOutput(structure, indexContent, [badMermaid, validPage('page-b')]);
-    expect(issues.some(i => i.message.includes('mismatched brackets'))).toBe(true);
-  });
-
-  it('warns about graph LR in mermaid', () => {
-    const lrMermaid = validPage('page-a');
-    lrMermaid.content += '\n```mermaid\ngraph LR\nA --> B\n```\n';
-    const issues = validateOutput(structure, indexContent, [lrMermaid, validPage('page-b')]);
-    expect(issues.some(i => i.message.includes('graph LR'))).toBe(true);
-  });
-
   it('detects broken links in index', () => {
     const badIndex = indexContent + '| [Ghost](ghost-page.md) | Missing | low |\n';
     const pages = [validPage('page-a'), validPage('page-b')];
@@ -126,9 +105,7 @@ describe('validateOutput', () => {
     const pages = [page, validPage('page-b')];
     const issues = validateOutput(structure, indexContent, pages);
     expect(page.content).toContain('B["Secrets Manager (AWS)"]');
-    expect(issues.some(i => i.message.includes('auto-fix'))).toBe(true);
-    // Should not have an error — the fix resolved it
-    expect(issues.some(i => i.level === 'error' && i.message.includes('special characters'))).toBe(false);
+    expect(issues.some(i => i.level === 'error' && i.message.includes('auto-fix needed'))).toBe(true);
   });
 
   it('auto-fixes node labels with pipes', () => {
@@ -169,5 +146,42 @@ describe('validateOutput', () => {
     page.content += '\n```mermaid\ngraph TD\n  A[Start] --> B[cost ($1)]\n```\n';
     validateOutput(structure, indexContent, [page, validPage('page-b')]);
     expect(page.content).toContain('B["cost ($1)"]');
+  });
+
+  it('auto-fixes node labels with nested square brackets', () => {
+    const page = validPage('page-a');
+    page.content += '\n```mermaid\ngraph TD\n  A[Start] --> B[returns process.env[key]]\n```\n';
+    const pages = [page, validPage('page-b')];
+    const issues = validateOutput(structure, indexContent, pages);
+    expect(page.content).toContain('B["returns process.env[key]"]');
+    expect(issues.some(i => i.level === 'error' && i.message.includes('auto-fix needed'))).toBe(true);
+  });
+
+  it('auto-fixes node labels with multiple nested bracket pairs', () => {
+    const page = validPage('page-a');
+    page.content += '\n```mermaid\ngraph TD\n  A[Start] --> B[a[b] and [c]]\n```\n';
+    validateOutput(structure, indexContent, [page, validPage('page-b')]);
+    expect(page.content).toContain('B["a[b] and [c]"]');
+  });
+
+  it('auto-fixes node labels with a leading forward slash', () => {
+    const page = validPage('page-a');
+    page.content += '\n```mermaid\ngraph TD\n  A[Start] --> B[/api/notion/title]\n```\n';
+    validateOutput(structure, indexContent, [page, validPage('page-b')]);
+    expect(page.content).toContain('B["/api/notion/title"]');
+  });
+
+  it('auto-fixes node labels with a backslash', () => {
+    const page = validPage('page-a');
+    page.content += '\n```mermaid\ngraph TD\n  A[Start] --> B[C:\\\\path\\\\to\\\\file]\n```\n';
+    validateOutput(structure, indexContent, [page, validPage('page-b')]);
+    expect(page.content).toContain('["');
+  });
+
+  it('auto-fixes node labels with a mid-label slash', () => {
+    const page = validPage('page-a');
+    page.content += '\n```mermaid\ngraph TD\n  A[Start] --> B[read/write access]\n```\n';
+    validateOutput(structure, indexContent, [page, validPage('page-b')]);
+    expect(page.content).toContain('B["read/write access"]');
   });
 });
