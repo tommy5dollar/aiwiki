@@ -69,22 +69,16 @@ NEVER use:
 - \`<div class="mermaid">\` HTML blocks
 - \`graph LR\` — always use \`graph TD\` (top-down)
 
-Keep node labels short (3-4 words max). For sequence diagrams, define all participants first.
+CRITICAL Mermaid syntax rules:
+1. ALWAYS wrap node labels in double quotes inside the brackets. This prevents Mermaid from misinterpreting special characters as shape syntax.
+2. Keep each line of a label under 25 characters. Use short descriptions, not raw function or file names. You may use up to 2 lines per label by inserting a real newline inside the quotes.
+3. For sequence diagrams, define all participants first.
 
-CRITICAL Mermaid syntax rule: Node labels inside square brackets MUST NOT contain parentheses \`()\`, curly braces \`{}\`, pipe \`|\`, nested square brackets \`[]\`, forward slashes \`/\`, or backslashes \`\\\` — Mermaid interprets these as shape syntax and the diagram will fail to render.
-
-Preferred fix: reword the label to avoid special characters:
-- BAD:  \`A[Event Bus (cis)]\` → GOOD: \`A[CIS Event Bus]\`
-- BAD:  \`B[Create|Update|Delete]\` → GOOD: \`B[Create Update Delete]\`
-- BAD:  \`I[returns process.env[key]]\` → GOOD: \`I[returns env var by key]\`
-- BAD:  \`C[/api/notion/title route]\` → GOOD: \`C[API Notion Title Route]\`
-
-If special characters are essential to the meaning, wrap the label in double quotes:
-- \`A["process.env || fallback"]\`
-- \`B["config/{env}.js"]\`
-- \`C["Secrets Manager (AWS)"]\`
-- \`I["process.env[key]"]\`
-- \`D["/api/notion/title"]\`
+- GOOD: \`A["Redis Cache"]\`
+- GOOD: \`B["Transform Request"]\` (not \`B["transformBodyToFriendlyData"]\`)
+- GOOD: \`C["Funding Service\\n(balance enquiry)"]\` (2-line label)
+- BAD: \`D[Redis Cache]\` (missing quotes)
+- BAD: \`E["transformBodyToFriendlyData service"]\` (too long, uses raw function name)
 
 ## Tables
 

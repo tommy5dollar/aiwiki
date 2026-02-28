@@ -1,9 +1,8 @@
 const LEVELS = { debug: 0, info: 1, warn: 2, error: 3 } as const;
 type Level = keyof typeof LEVELS;
 
-const currentLevel: Level = (process.env.DOCS_GEN_LOG_LEVEL as Level) || 'info';
-
 function log(level: Level, ...args: unknown[]) {
+  const currentLevel: Level = (process.env.DOCS_GEN_LOG_LEVEL as Level) || 'info';
   if (LEVELS[level] < LEVELS[currentLevel]) return;
   const prefix = `[aiwiki:${level}]`;
   if (level === 'error') {

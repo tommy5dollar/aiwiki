@@ -44,8 +44,8 @@ function parsePositiveInteger(
   return parsed;
 }
 
-function resolveDefaultMermaidValidationCommand(): string {
-  let currentDir = dirname(fileURLToPath(import.meta.url));
+export function resolveDefaultMermaidValidationCommand(startDir?: string): string {
+  let currentDir = startDir ?? dirname(fileURLToPath(import.meta.url));
   let mmdcPath = 'npx --no-install @mermaid-js/mermaid-cli';
 
   // Find mmdc binary
@@ -61,7 +61,7 @@ function resolveDefaultMermaidValidationCommand(): string {
   }
 
   // Find puppeteer config (ships with this package)
-  currentDir = dirname(fileURLToPath(import.meta.url));
+  currentDir = startDir ?? dirname(fileURLToPath(import.meta.url));
   let puppeteerConfigPath: string | undefined;
 
   while (true) {
@@ -152,11 +152,9 @@ export function loadConfig(): Config {
 
   return {
     openaiApiKey,
-    mermaidValidationCommand: get(
-      'DOCS_GEN_MERMAID_VALIDATE_COMMAND',
-      'mermaidValidationCommand',
+    mermaidValidationCommand:
+      get('DOCS_GEN_MERMAID_VALIDATE_COMMAND', 'mermaidValidationCommand', '') ||
       resolveDefaultMermaidValidationCommand(),
-    ),
     model,
     reasoningEffort,
     outputDir,

@@ -62,15 +62,9 @@ runs:
       shell: bash
       run: npm install -g @openai/codex
 
-    - name: Install package dependencies
+    - name: Install mermaid-cli
       shell: bash
-      working-directory: ${{ github.action_path }}
-      run: npm ci
-
-    - name: Build package
-      shell: bash
-      working-directory: ${{ github.action_path }}
-      run: npm run build
+      run: npm install -g @mermaid-js/mermaid-cli@11.12.0
 
     - name: Generate documentation
       shell: bash
@@ -87,7 +81,7 @@ runs:
         TIMEOUT: ${{ inputs.timeout }}
         EXCLUDED_DIRS: ${{ inputs.excluded_dirs }}
         LOG_LEVEL: ${{ inputs.log_level }}
-        DOCS_GEN_MERMAID_VALIDATE_COMMAND: ${{ github.action_path }}/node_modules/.bin/mmdc
+        DOCS_GEN_MERMAID_VALIDATE_COMMAND: mmdc
       run: |
         set -euo pipefail
 

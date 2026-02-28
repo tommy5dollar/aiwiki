@@ -76,4 +76,4 @@ const program = new Command()
     logger.info(`Completed in ${elapsed}s`);
   });
 
-program.parse();
+program.parseAsync();

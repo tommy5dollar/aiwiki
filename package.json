@@ -14,7 +14,8 @@
     "puppeteer-config.json"
   ],
   "scripts": {
-    "build": "tsc",
+    "build": "node esbuild.config.mjs",
+    "build:check": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint src/",
@@ -33,6 +34,7 @@
     "commander": "^13.1.0"
   },
   "devDependencies": {
+    "esbuild": "0.25.1",
     "@eslint/js": "^9.28.0",
     "@types/node": "^22.15.0",
     "@typescript-eslint/eslint-plugin": "^8.32.0",

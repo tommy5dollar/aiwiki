@@ -1,6 +1,6 @@
-import { mkdtempSync, rmSync } from 'fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
-import { join } from 'path';
+import { basename, join } from 'path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { loadConfig } from './config.js';
 
@@ -15,6 +15,15 @@ describe('loadConfig', () => {
     return path;
   }
 
+  /** Minimal env that lets loadConfig() run without triggering slow mmdc resolution */
+  function minimalEnv(repoRoot: string): Record<string, string> {
+    return {
+      OPENAI_API_KEY: 'test-key',
+      DOCS_GEN_REPO_ROOT: repoRoot,
+      DOCS_GEN_MERMAID_VALIDATE_COMMAND: 'mmdc',
+    };
+  }
+
   beforeEach(() => {
     process.argv = ['node', 'test'];
     process.env = { ...originalEnv };
@@ -26,39 +35,244 @@ describe('loadConfig', () => {
 
     while (createdDirs.length > 0) {
       const path = createdDirs.pop();
-      if (path) {
-        rmSync(path, { recursive: true, force: true });
-      }
+      if (path) rmSync(path, { recursive: true, force: true });
     }
   });
 
-  it('parses numeric config values as positive integers', () => {
-    process.env.OPENAI_API_KEY = 'test-key';
-    process.env.DOCS_GEN_REPO_ROOT = createTempRepoRoot();
-    process.env.DOCS_GEN_TIMEOUT = '120001';
-    process.env.DOCS_GEN_CONCURRENCY = '4';
-    process.env.DOCS_GEN_PAGE_TIMEOUT = '12000';
+  // --- Required fields ---
+
+  it('throws when OPENAI_API_KEY is absent', () => {
+    const repoRoot = createTempRepoRoot();
+    process.env = { DOCS_GEN_REPO_ROOT: repoRoot, DOCS_GEN_MERMAID_VALIDATE_COMMAND: 'mmdc' };
+    expect(() => loadConfig()).toThrow('OPENAI_API_KEY');
+  });
+
+  // --- Defaults ---
+
+  it('applies correct default values', () => {
+    const repoRoot = createTempRepoRoot();
+    process.env = { ...minimalEnv(repoRoot) };
 
     const config = loadConfig();
 
+    expect(config.model).toBe('gpt-5-mini');
+    expect(config.reasoningEffort).toBe('high');
+    expect(config.timeoutMs).toBe(1200000);
+    expect(config.concurrency).toBe(3);
+    expect(config.pageTimeout).toBe(300000);
+  });
+
+  it('auto-generates outputDir from model and reasoning effort', () => {
+    const repoRoot = createTempRepoRoot();
+    process.env = {
+      ...minimalEnv(repoRoot),
+      DOCS_GEN_MODEL: 'gpt-5-mini',
+      DOCS_GEN_REASONING_EFFORT: 'low',
+    };
+
+    const config = loadConfig();
+    expect(config.outputDir).toBe('docs-gpt-5-mini-low');
+  });
+
+  it('derives projectName from repoRoot basename', () => {
+    const repoRoot = createTempRepoRoot();
+    process.env = { ...minimalEnv(repoRoot) };
+
+    const config = loadConfig();
+    expect(config.projectName).toBe(basename(repoRoot));
+  });
+
+  it('auto-generates a traceId with aiwiki prefix', () => {
+    const repoRoot = createTempRepoRoot();
+    process.env = { ...minimalEnv(repoRoot) };
+
+    const config = loadConfig();
+    expect(config.traceId).toMatch(/^aiwiki-[a-f0-9]{8}$/);
+  });
+
+  // --- Numeric parsing ---
+
+  it('parses numeric config values as positive integers', () => {
+    const repoRoot = createTempRepoRoot();
+    process.env = {
+      ...minimalEnv(repoRoot),
+      DOCS_GEN_TIMEOUT: '120001',
+      DOCS_GEN_CONCURRENCY: '4',
+      DOCS_GEN_PAGE_TIMEOUT: '12000',
+    };
+
+    const config = loadConfig();
     expect(config.timeoutMs).toBe(120001);
     expect(config.concurrency).toBe(4);
     expect(config.pageTimeout).toBe(12000);
   });
 
   it('throws when timeout is not numeric', () => {
-    process.env.OPENAI_API_KEY = 'test-key';
-    process.env.DOCS_GEN_REPO_ROOT = createTempRepoRoot();
-    process.env.DOCS_GEN_TIMEOUT = 'abc';
-
+    const repoRoot = createTempRepoRoot();
+    process.env = { ...minimalEnv(repoRoot), DOCS_GEN_TIMEOUT: 'abc' };
     expect(() => loadConfig()).toThrow('DOCS_GEN_TIMEOUT must be a positive integer');
   });
 
   it('throws when concurrency is zero', () => {
-    process.env.OPENAI_API_KEY = 'test-key';
-    process.env.DOCS_GEN_REPO_ROOT = createTempRepoRoot();
-    process.env.DOCS_GEN_CONCURRENCY = '0';
-
+    const repoRoot = createTempRepoRoot();
+    process.env = { ...minimalEnv(repoRoot), DOCS_GEN_CONCURRENCY: '0' };
     expect(() => loadConfig()).toThrow('DOCS_GEN_CONCURRENCY must be a positive integer');
+  });
+
+  // --- Config file ---
+
+  it('loads config from .aiwiki.json in repo root', () => {
+    const repoRoot = createTempRepoRoot();
+    writeFileSync(
+      join(repoRoot, '.aiwiki.json'),
+      JSON.stringify({ model: 'gpt-5', reasoningEffort: 'low' }),
+      'utf-8',
+    );
+    process.env = { ...minimalEnv(repoRoot) };
+
+    const config = loadConfig();
+    expect(config.model).toBe('gpt-5');
+    expect(config.reasoningEffort).toBe('low');
+  });
+
+  it('env vars take priority over file config', () => {
+    const repoRoot = createTempRepoRoot();
+    writeFileSync(
+      join(repoRoot, '.aiwiki.json'),
+      JSON.stringify({ model: 'gpt-from-file' }),
+      'utf-8',
+    );
+    process.env = { ...minimalEnv(repoRoot), DOCS_GEN_MODEL: 'gpt-from-env' };
+
+    const config = loadConfig();
+    expect(config.model).toBe('gpt-from-env');
+  });
+
+  // --- CLI args take highest priority ---
+
+  it('CLI args take priority over env vars', () => {
+    const repoRoot = createTempRepoRoot();
+    process.env = { ...minimalEnv(repoRoot), DOCS_GEN_MODEL: 'gpt-from-env' };
+    process.argv = ['node', 'test', '--model', 'gpt-from-cli'];
+
+    const config = loadConfig();
+    expect(config.model).toBe('gpt-from-cli');
+  });
+
+  it('parses --reasoning-effort CLI arg', () => {
+    const repoRoot = createTempRepoRoot();
+    process.env = { ...minimalEnv(repoRoot) };
+    process.argv = ['node', 'test', '--reasoning-effort', 'low'];
+
+    const config = loadConfig();
+    expect(config.reasoningEffort).toBe('low');
+  });
+
+  it('parses --concurrency CLI arg', () => {
+    const repoRoot = createTempRepoRoot();
+    process.env = { ...minimalEnv(repoRoot) };
+    process.argv = ['node', 'test', '--concurrency', '5'];
+
+    const config = loadConfig();
+    expect(config.concurrency).toBe(5);
+  });
+
+  it('parses --page-timeout CLI arg', () => {
+    const repoRoot = createTempRepoRoot();
+    process.env = { ...minimalEnv(repoRoot) };
+    process.argv = ['node', 'test', '--page-timeout', '60000'];
+
+    const config = loadConfig();
+    expect(config.pageTimeout).toBe(60000);
+  });
+
+  it('parses --timeout CLI arg', () => {
+    const repoRoot = createTempRepoRoot();
+    process.env = { ...minimalEnv(repoRoot) };
+    process.argv = ['node', 'test', '--timeout', '600000'];
+
+    const config = loadConfig();
+    expect(config.timeoutMs).toBe(600000);
+  });
+
+  it('parses --project-name CLI arg', () => {
+    const repoRoot = createTempRepoRoot();
+    process.env = { ...minimalEnv(repoRoot) };
+    process.argv = ['node', 'test', '--project-name', 'my-project'];
+
+    const config = loadConfig();
+    expect(config.projectName).toBe('my-project');
+  });
+
+  it('parses --output-dir CLI arg', () => {
+    const repoRoot = createTempRepoRoot();
+    process.env = { ...minimalEnv(repoRoot) };
+    process.argv = ['node', 'test', '--output-dir', 'my-docs'];
+
+    const config = loadConfig();
+    expect(config.outputDir).toBe('my-docs');
+  });
+
+  it('parses --trace-id CLI arg', () => {
+    const repoRoot = createTempRepoRoot();
+    process.env = { ...minimalEnv(repoRoot) };
+    process.argv = ['node', 'test', '--trace-id', 'my-trace-123'];
+
+    const config = loadConfig();
+    expect(config.traceId).toBe('my-trace-123');
+  });
+
+  it('parses --excluded-dirs CLI arg', () => {
+    const repoRoot = createTempRepoRoot();
+    process.env = { ...minimalEnv(repoRoot) };
+    process.argv = ['node', 'test', '--excluded-dirs', 'node_modules,.git,coverage'];
+
+    const config = loadConfig();
+    expect(config.excludedDirs).toContain('node_modules');
+    expect(config.excludedDirs).toContain('.git');
+    expect(config.excludedDirs).toContain('coverage');
+  });
+
+  // --- Excluded dirs ---
+
+  it('auto-appends outputDir to excludedDirs', () => {
+    const repoRoot = createTempRepoRoot();
+    process.env = { ...minimalEnv(repoRoot), DOCS_GEN_OUTPUT_DIR: 'my-docs' };
+
+    const config = loadConfig();
+    expect(config.excludedDirs).toContain('my-docs');
+  });
+
+  it('does not duplicate outputDir in excludedDirs', () => {
+    const repoRoot = createTempRepoRoot();
+    process.env = {
+      ...minimalEnv(repoRoot),
+      DOCS_GEN_OUTPUT_DIR: 'my-docs',
+      DOCS_GEN_EXCLUDED_DIRS: 'node_modules,my-docs',
+    };
+
+    const config = loadConfig();
+    expect(config.excludedDirs.filter(d => d === 'my-docs')).toHaveLength(1);
+  });
+
+  // --- Excluded extensions ---
+
+  it('default excluded extensions include common binary types', () => {
+    const repoRoot = createTempRepoRoot();
+    process.env = { ...minimalEnv(repoRoot) };
+
+    const config = loadConfig();
+    expect(config.excludedExtensions).toContain('.png');
+    expect(config.excludedExtensions).toContain('.lock');
+    expect(config.excludedExtensions).toContain('.map');
+  });
+
+  it('parses custom excluded extensions from env', () => {
+    const repoRoot = createTempRepoRoot();
+    process.env = { ...minimalEnv(repoRoot), DOCS_GEN_EXCLUDED_EXTENSIONS: '.pdf,.csv' };
+
+    const config = loadConfig();
+    expect(config.excludedExtensions).toContain('.pdf');
+    expect(config.excludedExtensions).toContain('.csv');
   });
 });
