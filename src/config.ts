@@ -115,13 +115,7 @@ export function loadConfig(): Config {
     const raw = readFileSync(resolve(repoRoot, '.aiwiki.json'), 'utf-8');
     fileConfig = JSON.parse(raw);
   } catch {
-    try {
-      // Backwards compatibility with older config filename
-      const raw = readFileSync(resolve(repoRoot, '.docs-gen.json'), 'utf-8');
-      fileConfig = JSON.parse(raw);
-    } catch {
-      // No config file — that's fine
-    }
+    // No config file — that's fine
   }
 
   function get<T>(envKey: string, fileKey: string, defaultVal: T): T {
