@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { execFileSync } from 'child_process';
+import { appendFileSync } from 'fs';
 import { Command } from 'commander';
 import { loadConfig } from './config.js';
 import { generateCodexWiki } from './generator/codex-page-generator.js';
@@ -69,6 +70,13 @@ const program = new Command()
 
     if (!valid) {
       logger.warn('Output written despite validation errors — review the files');
+    }
+
+    // Write GitHub Actions outputs when running in CI
+    const githubOutput = process.env.GITHUB_OUTPUT;
+    if (githubOutput) {
+      appendFileSync(githubOutput, `output_dir=${config.outputDir}\n`);
+      appendFileSync(githubOutput, `trace_id=${config.traceId}\n`);
     }
 
     // Summary
