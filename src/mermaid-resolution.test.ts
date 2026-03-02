@@ -1,6 +1,6 @@
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
-import { join, resolve } from 'path';
+import { join } from 'path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { resolveDefaultMermaidValidationCommand } from './config.js';
 
