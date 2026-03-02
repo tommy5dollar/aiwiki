@@ -78,14 +78,6 @@ describe('loadConfig', () => {
     expect(config.projectName).toBe(basename(repoRoot));
   });
 
-  it('auto-generates a traceId with aiwiki prefix', () => {
-    const repoRoot = createTempRepoRoot();
-    process.env = { ...minimalEnv(repoRoot) };
-
-    const config = loadConfig();
-    expect(config.traceId).toMatch(/^aiwiki-[a-f0-9]{8}$/);
-  });
-
   // --- Numeric parsing ---
 
   it('parses numeric config values as positive integers', () => {
@@ -207,15 +199,6 @@ describe('loadConfig', () => {
 
     const config = loadConfig();
     expect(config.outputDir).toBe('my-docs');
-  });
-
-  it('parses --trace-id CLI arg', () => {
-    const repoRoot = createTempRepoRoot();
-    process.env = { ...minimalEnv(repoRoot) };
-    process.argv = ['node', 'test', '--trace-id', 'my-trace-123'];
-
-    const config = loadConfig();
-    expect(config.traceId).toBe('my-trace-123');
   });
 
   it('parses --excluded-dirs CLI arg', () => {

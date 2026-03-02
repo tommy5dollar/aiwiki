@@ -76,7 +76,6 @@ const program = new Command()
     const githubOutput = process.env.GITHUB_OUTPUT;
     if (githubOutput) {
       appendFileSync(githubOutput, `output_dir=${config.outputDir}\n`);
-      appendFileSync(githubOutput, `trace_id=${config.traceId}\n`);
     }
 
     // Summary

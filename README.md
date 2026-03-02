@@ -50,7 +50,6 @@ The action checks out your repository, runs the agents, then commits the generat
 | `timeout` | `1200000` | Overall timeout in ms |
 | `excluded_dirs` | | Comma-separated extra directories to exclude |
 | `project_name` | basename of repo | Project name used in prompts |
-| `trace_id` | auto-generated | Trace ID to tag this run |
 | `log_level` | `info` | Log level: `debug`, `info`, `warn`, `error` |
 
 ### Action outputs
@@ -58,7 +57,6 @@ The action checks out your repository, runs the agents, then commits the generat
 | Output | Description |
 |---|---|
 | `output_dir` | Resolved output directory where docs were written |
-| `trace_id` | Trace ID used for this run |
 | `pr_url` | URL of the created or updated pull request |
 
 ## CLI
@@ -103,7 +101,6 @@ OPENAI_API_KEY=sk-... aiwiki
 | `--timeout <ms>` | `DOCS_GEN_TIMEOUT` | `1200000` | Overall timeout (ms) |
 | `--excluded-dirs <dirs>` | `DOCS_GEN_EXCLUDED_DIRS` | `node_modules,.git,...` | Comma-separated directories to exclude |
 | `--project-name <name>` | `DOCS_GEN_PROJECT_NAME` | basename of repo root | Project name used in prompts |
-| `--trace-id <id>` | `DOCS_GEN_TRACE_ID` | auto-generated | Trace ID to tag this run |
 | `--log-level <level>` | `DOCS_GEN_LOG_LEVEL` | `info` | Log level: debug, info, warn, error |
 
 ### Configuration file

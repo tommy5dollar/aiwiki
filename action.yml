@@ -45,10 +45,6 @@ inputs:
     description: Optional comma-separated directories to exclude
     required: false
     default: ''
-  trace_id:
-    description: Optional trace ID to tag this run (auto-generated if omitted)
-    required: false
-    default: ''
   log_level:
     description: Log level (debug, info, warn, error)
     required: false
@@ -58,9 +54,6 @@ outputs:
   output_dir:
     description: The resolved output directory (relative to repo_root) where docs were written
     value: ${{ steps.generate.outputs.output_dir }}
-  trace_id:
-    description: The trace ID used for this run
-    value: ${{ steps.generate.outputs.trace_id }}
   pr_url:
     description: The URL of the created or updated pull request
     value: ${{ steps.create-pr.outputs.pr_url }}
@@ -101,7 +94,6 @@ runs:
         PAGE_TIMEOUT: ${{ inputs.page_timeout }}
         TIMEOUT: ${{ inputs.timeout }}
         EXCLUDED_DIRS: ${{ inputs.excluded_dirs }}
-        TRACE_ID: ${{ inputs.trace_id }}
         LOG_LEVEL: ${{ inputs.log_level }}
       run: |
         set -euo pipefail
@@ -126,10 +118,6 @@ runs:
 
         if [[ -n "$EXCLUDED_DIRS" ]]; then
           args+=(--excluded-dirs "$EXCLUDED_DIRS")
-        fi
-
-        if [[ -n "$TRACE_ID" ]]; then
-          args+=(--trace-id "$TRACE_ID")
         fi
 
         node "$GITHUB_ACTION_PATH/dist/cli.js" "${args[@]}"

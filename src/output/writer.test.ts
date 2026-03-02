@@ -18,7 +18,6 @@ function createConfig(repoRoot: string, outputDir: string): Config {
     timeoutMs: 120000,
     concurrency: 2,
     pageTimeout: 30000,
-    traceId: 'aiwiki-test-1234',
   };
 }
 

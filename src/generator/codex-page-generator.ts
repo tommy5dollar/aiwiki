@@ -351,7 +351,6 @@ export async function generateCodexWiki(
 ): Promise<{ structure: WikiStructure; pages: GeneratedPage[] }> {
   logger.info('Starting two-phase codex wiki generation...');
   logger.info(`Model: ${config.model}`);
-  logger.info(`Trace ID: ${config.traceId}`);
 
   // Phase 1: Catalog
   const catalog = await generateCodexCatalog(config);

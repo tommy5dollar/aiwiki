@@ -2,8 +2,6 @@ import { chmodSync, copyFileSync, existsSync, readFileSync, writeFileSync } from
 import { dirname, basename, resolve, join } from 'path';
 import { tmpdir } from 'os';
 import { fileURLToPath } from 'url';
-import { randomUUID } from 'crypto';
-
 export interface Config {
   openaiApiKey: string;
   mermaidValidationCommand: string;
@@ -17,7 +15,6 @@ export interface Config {
   timeoutMs: number;
   concurrency: number;
   pageTimeout: number;
-  traceId: string;
 }
 
 function parseCliArgs(): Record<string, string> {
@@ -102,7 +99,6 @@ const CLI_TO_CONFIG: Record<string, { envKey: string; fileKey: string }> = {
   'repo-root':         { envKey: 'DOCS_GEN_REPO_ROOT', fileKey: 'repoRoot' },
   'project-name':      { envKey: 'DOCS_GEN_PROJECT_NAME', fileKey: 'projectName' },
   'excluded-dirs':     { envKey: 'DOCS_GEN_EXCLUDED_DIRS', fileKey: 'excludedDirs' },
-  'trace-id':          { envKey: 'DOCS_GEN_TRACE_ID', fileKey: 'traceId' },
 };
 
 export function loadConfig(): Config {
@@ -164,6 +160,5 @@ export function loadConfig(): Config {
     timeoutMs: parsePositiveInteger(get('DOCS_GEN_TIMEOUT', 'timeout', '1200000'), 'DOCS_GEN_TIMEOUT'), // 20 min default
     concurrency: parsePositiveInteger(get('DOCS_GEN_CONCURRENCY', 'concurrency', '3'), 'DOCS_GEN_CONCURRENCY'),
     pageTimeout: parsePositiveInteger(get('DOCS_GEN_PAGE_TIMEOUT', 'pageTimeout', '300000'), 'DOCS_GEN_PAGE_TIMEOUT'), // 5 min default
-    traceId: get('DOCS_GEN_TRACE_ID', 'traceId', `aiwiki-${randomUUID().slice(0, 8)}`),
   };
 }
