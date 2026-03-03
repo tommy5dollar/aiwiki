@@ -1,5 +1,8 @@
 name: AI Docs Generator
 description: Generate Markdown docs for a repository using aiwiki
+branding:
+  icon: book-open
+  color: blue
 
 inputs:
   openai_api_key:
