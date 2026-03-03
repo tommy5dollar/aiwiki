@@ -27,7 +27,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Generate documentation
-        uses: tommy5dollar/aiwiki@main
+        uses: tommy5dollar/aiwiki@v1
         with:
           openai_api_key: ${{ secrets.OPENAI_API_KEY }}
 ```
