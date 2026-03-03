@@ -71,6 +71,10 @@ runs:
       with:
         node-version: "22"
 
+    - name: Build aiwiki
+      shell: bash
+      run: cd "$GITHUB_ACTION_PATH" && npm ci && npm run build
+
     - name: Install Codex CLI
       shell: bash
       run: npm install -g @openai/codex
